@@ -208,6 +208,20 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
  */
 public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
 
+
+  public static abstract class FlushCallback implements Runnable{
+    private long sequenceNumber;
+
+    public void setSequenceNumber(long sequenceNumber){
+      this.sequenceNumber = sequenceNumber;
+    }
+
+    public long getSequenceNumber(){
+      return sequenceNumber;
+    }
+
+  }
+
   /** Hard limit on maximum number of documents that may be added to the
    *  index.  If you try to add more than this you'll hit {@code IllegalArgumentException}. */
   // We defensively subtract 128 to be well below the lowest
@@ -221,6 +235,11 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
   // Use package-private instance var to enforce the limit so testing
   // can use less electricity:
   private static int actualMaxDocs = MAX_DOCS;
+
+  //this task should perform WAL flush till some time point
+  private FlushCallback flushTaskBefore = null;
+  //this task should perform WAL truncate (or mark for truncate) till some time point
+  private FlushCallback flushTaskAfter = null;
 
   /** Used only for testing. */
   static void setMaxDocs(int maxDocs) {
@@ -450,7 +469,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
       synchronized (fullFlushLock) {
         try {
           // TODO: should we somehow make this available in the returned NRT reader?
-          long seqNo = docWriter.flushAllThreads();
+          long seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter);
           if (seqNo < 0) {
             anyChanges = true;
             seqNo = -seqNo;
@@ -3243,7 +3262,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
           boolean flushSuccess = false;
           boolean success = false;
           try {
-            seqNo = docWriter.flushAllThreads();
+            seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter);
             if (seqNo < 0) {
               anyChanges = true;
               seqNo = -seqNo;
@@ -3612,7 +3631,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
       synchronized (fullFlushLock) {
         boolean flushSuccess = false;
         try {
-          long seqNo = docWriter.flushAllThreads();
+          long seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter);
           if (seqNo < 0) {
             seqNo = -seqNo;
             anyChanges = true;
@@ -5173,5 +5192,13 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
     long count = pendingNumDocs.addAndGet(numDocs);
     assert count >= 0 : "pendingNumDocs is negative: " + count;
     return count;
+  }
+
+  public void setFlushTaskBefore(FlushCallback task){
+    this.flushTaskBefore = task;
+  }
+
+  public void setFlushTaskAfter(FlushCallback task){
+    this.flushTaskAfter = task;
   }
 }
