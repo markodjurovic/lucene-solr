@@ -644,7 +644,8 @@ final class DocumentsWriter implements Closeable, Accountable {
    * two stage operation; the caller must ensure (in try/finally) that finishFlush
    * is called after this method, to release the flush lock in DWFlushControl
    */
-  long flushAllThreads(IndexWriter.FlushCallback callbackBefore, IndexWriter.FlushCallback callbackAfter)
+  long flushAllThreads(IndexWriter.FlushCallback callbackBefore, IndexWriter.FlushCallback callbackAfter,
+          long uniqueWriterIndex)
     throws IOException, AbortingException {
     final DocumentsWriterDeleteQueue flushingDeleteQueue;
     if (infoStream.isEnabled("DW")) {
@@ -669,6 +670,7 @@ final class DocumentsWriter implements Closeable, Accountable {
     try {
       if (callbackBefore != null) {
         callbackBefore.setSequenceNumber(seqNo);
+        callbackBefore.setWriterIndex(uniqueWriterIndex);
         callbackBefore.run();
       }
 
@@ -698,6 +700,7 @@ final class DocumentsWriter implements Closeable, Accountable {
 
     if (callbackAfter != null){
       callbackAfter.setSequenceNumber(seqNo);
+      callbackAfter.setWriterIndex(uniqueWriterIndex);
       callbackAfter.run();
     }
 

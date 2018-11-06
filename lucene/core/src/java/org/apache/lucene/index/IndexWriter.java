@@ -211,6 +211,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
 
   public static abstract class FlushCallback implements Runnable{
     private long sequenceNumber;
+    private long writerIndex;
 
     public void setSequenceNumber(long sequenceNumber){
       this.sequenceNumber = sequenceNumber;
@@ -220,6 +221,14 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
       return sequenceNumber;
     }
 
+    public long getWriterIndex() {
+      return writerIndex;
+    }
+
+    public void setWriterIndex(long writerIndex) {
+      this.writerIndex = writerIndex;
+    }
+    
   }
 
   /** Hard limit on maximum number of documents that may be added to the
@@ -374,7 +383,15 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
    *  much like how hotels place an "authorization hold" on your credit
    *  card to make sure they can later charge you when you check out. */
   final AtomicLong pendingNumDocs = new AtomicLong();
+  
+  private static final AtomicLong uniqueWriterIndexCounter = new AtomicLong();
+  private final Long uniqueIndex;
 
+  
+  public long getUniqueIndex(){
+    return uniqueIndex;
+  }
+  
   DirectoryReader getReader() throws IOException {
     return getReader(true, false);
   }
@@ -469,7 +486,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
       synchronized (fullFlushLock) {
         try {
           // TODO: should we somehow make this available in the returned NRT reader?
-          long seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter);
+          long seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter, uniqueIndex);
           if (seqNo < 0) {
             anyChanges = true;
             seqNo = -seqNo;
@@ -1188,6 +1205,8 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
         writeLock = null;
       }
     }
+    
+    uniqueIndex = uniqueWriterIndexCounter.incrementAndGet();
   }
 
   /** Confirms that the incoming index sort (if any) matches the existing index sort (if any).
@@ -3262,7 +3281,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
           boolean flushSuccess = false;
           boolean success = false;
           try {
-            seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter);
+            seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter, uniqueIndex);
             if (seqNo < 0) {
               anyChanges = true;
               seqNo = -seqNo;
@@ -3631,7 +3650,7 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
       synchronized (fullFlushLock) {
         boolean flushSuccess = false;
         try {
-          long seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter);
+          long seqNo = docWriter.flushAllThreads(flushTaskBefore, flushTaskAfter, uniqueIndex);
           if (seqNo < 0) {
             seqNo = -seqNo;
             anyChanges = true;
