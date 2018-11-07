@@ -669,7 +669,9 @@ final class DocumentsWriter implements Closeable, Accountable {
     boolean anythingFlushed = false;
     try {
       if (callbackBefore != null) {
-        callbackBefore.setSequenceNumber(seqNo);
+        //in DocumentsWriterFlushControl#markForFullFlush() this is number added to seqNo
+        long luceneMagicNumber = perThreadPool.getActiveThreadStateCount() + 2;
+        callbackBefore.setSequenceNumber(seqNo - luceneMagicNumber);
         callbackBefore.setWriterIndex(uniqueWriterIndex);
         callbackBefore.run();
       }
