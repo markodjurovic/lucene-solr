@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -212,7 +213,8 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
   public static abstract class FlushCallback implements Runnable{
     private long sequenceNumber;
     private long writerIndex;
-
+    private boolean RAMDirectory;
+    
     public void setSequenceNumber(long sequenceNumber){
       this.sequenceNumber = sequenceNumber;
     }
@@ -227,6 +229,14 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
 
     public void setWriterIndex(long writerIndex) {
       this.writerIndex = writerIndex;
+    }
+
+    public boolean isRAMDirectory() {
+      return RAMDirectory;
+    }
+
+    public void setRAMDirectory(boolean isRAMDirectory) {
+      this.RAMDirectory = isRAMDirectory;
     }
     
   }

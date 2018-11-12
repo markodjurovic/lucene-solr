@@ -33,6 +33,8 @@ import org.apache.lucene.index.IndexWriter.Event;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.LockValidatingDirectoryWrapper;
+import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.InfoStream;
 
@@ -95,6 +97,24 @@ import org.apache.lucene.util.InfoStream;
  */
 
 final class DocumentsWriter implements Closeable, Accountable {
+  
+  private boolean isRAMDirectory(Directory dir){
+    if (directory instanceof RAMDirectory){
+      return true;
+    }
+    if (directory instanceof LockValidatingDirectoryWrapper){
+      Directory delegate = ((LockValidatingDirectoryWrapper)directory).getDelegate();
+      if (delegate instanceof RAMDirectory){
+        return true;
+      }
+      if (delegate instanceof LockValidatingDirectoryWrapper){
+        return isRAMDirectory(delegate);
+      }
+    }
+    
+    return false;
+  }
+  
   private final Directory directoryOrig; // no wrapping, for infos
   private final Directory directory;
 
@@ -128,7 +148,7 @@ final class DocumentsWriter implements Closeable, Accountable {
     this.directoryOrig = directoryOrig;
     this.directory = directory;
     this.config = config;
-    this.infoStream = config.getInfoStream();
+    this.infoStream = config.getInfoStream();    
     this.deleteQueue = new DocumentsWriterDeleteQueue(infoStream);
     this.perThreadPool = config.getIndexerThreadPool();
     flushPolicy = config.getFlushPolicy();
@@ -667,12 +687,14 @@ final class DocumentsWriter implements Closeable, Accountable {
     assert currentFullFlushDelQueue != deleteQueue;
     
     boolean anythingFlushed = false;
+    boolean isRAMDirectory = isRAMDirectory(directory);
     try {
       if (callbackBefore != null) {
         //in DocumentsWriterFlushControl#markForFullFlush() this is number added to seqNo
         long luceneMagicNumber = perThreadPool.getActiveThreadStateCount() + 2;
         callbackBefore.setSequenceNumber(seqNo - luceneMagicNumber);
         callbackBefore.setWriterIndex(uniqueWriterIndex);
+        callbackBefore.setRAMDirectory(isRAMDirectory);
         callbackBefore.run();
       }
 
@@ -701,9 +723,9 @@ final class DocumentsWriter implements Closeable, Accountable {
     }
 
     if (callbackAfter != null){
-      callbackAfter.setSequenceNumber(seqNo);
-      callbackAfter.setWriterIndex(uniqueWriterIndex);
-      callbackAfter.run();
+      callbackAfter.setSequenceNumber(Math.abs(seqNo));
+      callbackAfter.setWriterIndex(uniqueWriterIndex);      
+      callbackAfter.run();      
     }
 
     return seqNo;
