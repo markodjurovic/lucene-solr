@@ -98,12 +98,12 @@ import org.apache.lucene.util.InfoStream;
 
 final class DocumentsWriter implements Closeable, Accountable {
   
-  private boolean isRAMDirectory(Directory dir){
-    if (directory instanceof RAMDirectory){
+  private boolean isRAMDirectory(final Directory dir){
+    if (dir instanceof RAMDirectory){
       return true;
     }
-    if (directory instanceof LockValidatingDirectoryWrapper){
-      Directory delegate = ((LockValidatingDirectoryWrapper)directory).getDelegate();
+    if (dir instanceof LockValidatingDirectoryWrapper){
+      Directory delegate = ((LockValidatingDirectoryWrapper)dir).getDelegate();
       if (delegate instanceof RAMDirectory){
         return true;
       }
