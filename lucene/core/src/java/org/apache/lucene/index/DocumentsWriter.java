@@ -691,11 +691,23 @@ final class DocumentsWriter implements Closeable, Accountable {
     try {
       if (callbackBefore != null) {
         //in DocumentsWriterFlushControl#markForFullFlush() this is number added to seqNo
-        long luceneMagicNumber = perThreadPool.getActiveThreadStateCount() + 2;
-        callbackBefore.setSequenceNumber(seqNo - luceneMagicNumber);
+        int luceneMagicNumber = perThreadPool.getActiveThreadStateCount() + 2;
+        callbackBefore.setLuceneMagicNumber(luceneMagicNumber);
+        callbackBefore.setSequenceNumber(seqNo);// - luceneMagicNumber);
         callbackBefore.setWriterIndex(uniqueWriterIndex);
         callbackBefore.setRAMDirectory(isRAMDirectory);
-        callbackBefore.run();
+        try{
+          callbackBefore.call();
+        }
+        catch (IndexWriter.RetryOvercount exc){
+          return seqNo;
+        }
+        catch (Exception exc){
+          //some serious error
+          if (infoStream.isEnabled("DW")) {
+            infoStream.message("DW", Thread.currentThread().getName() + "Error in callback: " + exc.getMessage());
+          }
+        }
       }
 
       DocumentsWriterPerThread flushingDWPT;
@@ -725,7 +737,15 @@ final class DocumentsWriter implements Closeable, Accountable {
     if (callbackAfter != null){
       callbackAfter.setSequenceNumber(Math.abs(seqNo));
       callbackAfter.setWriterIndex(uniqueWriterIndex);      
-      callbackAfter.run();      
+      try{
+        callbackAfter.call();
+      }
+      catch (Exception exc){
+        //some serious error
+        if (infoStream.isEnabled("DW")) {
+          infoStream.message("DW", Thread.currentThread().getName() + "Error in callback: " + exc.getMessage());
+        }
+      }  
     }
 
     return seqNo;

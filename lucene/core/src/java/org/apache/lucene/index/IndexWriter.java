@@ -210,10 +210,11 @@ import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
 
 
-  public static abstract class FlushCallback implements Runnable{
+  public static abstract class FlushCallback implements Callable<Long>{
     private long sequenceNumber;
     private long writerIndex;
     private boolean RAMDirectory;
+    private int luceneMagicNumber;
     
     public void setSequenceNumber(long sequenceNumber){
       this.sequenceNumber = sequenceNumber;
@@ -238,7 +239,19 @@ public class IndexWriter implements Closeable, TwoPhaseCommit, Accountable {
     public void setRAMDirectory(boolean isRAMDirectory) {
       this.RAMDirectory = isRAMDirectory;
     }
+
+    public int getLuceneMagicNumber() {
+      return luceneMagicNumber;
+    }
+
+    public void setLuceneMagicNumber(int luceneMagicNumber) {
+      this.luceneMagicNumber = luceneMagicNumber;
+    }
     
+  }
+  
+  public static class RetryOvercount extends Exception{
+  
   }
 
   /** Hard limit on maximum number of documents that may be added to the
